@@ -3,24 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ピラミッドソリティア（レスポンシブ版）</title>
+<title>ピラミッドソリティア（自動移動＆赤裏）</title>
 <style>
-body {
-  margin:0; padding:0; font-family:sans-serif; background:#0b2946; color:white; display:flex; flex-direction:column; align-items:center;
-}
+body { margin:0; padding:0; font-family:sans-serif; background:#0b2946; color:white; display:flex; flex-direction:column; align-items:center;}
 h1 { margin:20px 0 10px; }
 #message { font-size:1.5rem; color:gold; margin-bottom:10px; text-align:center; }
 #score,#timer,#stock-count,#highscore{ font-size:1.2rem; margin-bottom:5px; text-align:center; }
 .game-area { display:flex; flex-direction:column; align-items:center; width:100%; max-width:600px; }
 .pyramid { position:relative; width:100%; height:calc(90px*7 + 60px); margin-bottom:20px; }
-.card { position:absolute; border-radius:8px; display:flex; justify-content:center; align-items:center; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.3); cursor:pointer; user-select:none; transition:all 0.3s; }
+.card { position:absolute; border-radius:8px; display:flex; justify-content:center; align-items:center; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.3); cursor:pointer; user-select:none; transition:all 0.3s; touch-action: none; background:white; color:black;}
+.card.back { background:red; color:white;}
 .card.hidden { visibility:hidden; }
 .card.selected { transform:translateY(-10px); box-shadow:0 6px 10px rgba(255,255,255,0.6);}
 .card.removing { animation:removeCard 0.5s forwards; }
+.card.hint { border:2px solid red; }
 @keyframes removeCard {0%{opacity:1; transform:scale(1);}100%{opacity:0; transform:scale(0);}}
 .controls { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-bottom:20px; }
 #stock,#waste { display:flex; gap:10px; min-height:80px; }
-.card.small { transition:all 0.3s; border-radius:6px; text-align:center; }
+.card.small { transition:all 0.3s; border-radius:6px; text-align:center; background:red; color:white;}
 button { padding:6px 12px; font-size:0.95rem; border-radius:6px; border:none; background:gold; color:#0b2946; cursor:pointer;}
 button:hover { background:#ffc700;}
 </style>
@@ -39,18 +39,17 @@ button:hover { background:#ffc700;}
     <button id="draw">山札からめくる</button>
     <div id="waste"></div>
     <button id="reset">新しいゲーム</button>
+    <button id="hintBtn">ヒント</button>
+    <button id="autoBtn">自動移動</button>
   </div>
 </div>
 <script>
 const suits=['♠','♥','♦','♣'], values=[1,2,3,4,5,6,7,8,9,10,11,12,13];
 let deck=[], pyramidData=[], stock=[], waste=[], selected=[], score=0, time=0, timerInterval;
 const pyramidDiv=document.getElementById('pyramid'), stockDiv=document.getElementById('stock'), wasteDiv=document.getElementById('waste');
-const drawBtn=document.getElementById('draw'), resetBtn=document.getElementById('reset');
+const drawBtn=document.getElementById('draw'), resetBtn=document.getElementById('reset'), hintBtn=document.getElementById('hintBtn'), autoBtn=document.getElementById('autoBtn');
 const messageDiv=document.getElementById('message'), scoreDiv=document.getElementById('score'), timerDiv=document.getElementById('timer');
 const stockCountDiv=document.getElementById('stock-count'), highscoreDiv=document.getElementById('highscore');
-
-function getHighScore(){ return parseInt(localStorage.getItem('pyramidHighScore'))||0;}
-function setHighScore(v){ localStorage.setItem('pyramidHighScore',v); }
 
 function newGame(){
   clearInterval(timerInterval); time=0; score=0; scoreDiv.textContent='スコア:0'; messageDiv.textContent='';
@@ -65,42 +64,111 @@ function newGame(){
 function render(){
   pyramidDiv.innerHTML='';
   const width=pyramidDiv.clientWidth;
-  const cardW=Math.min(60, width/7*0.9); // 画面に合わせてカード幅調整
+  const cardW=Math.min(60, width/7*0.9);
   const cardH=cardW*1.5;
   pyramidData.forEach((row,rowIndex)=>{
     const rowCards=row.length;
     const startX=(width - (rowCards*(cardW+5)))/2;
     row.forEach((card,colIndex)=>{
       const cardDiv=document.createElement('div'); cardDiv.className='card';
+      if(!canRemove(card)) cardDiv.classList.add('back'); // 裏面赤
       cardDiv.style.width=cardW+'px'; cardDiv.style.height=cardH+'px';
       cardDiv.style.top=(rowIndex*(cardH+5))+'px';
       cardDiv.style.left=(startX+colIndex*(cardW+5))+'px';
       cardDiv.textContent=card.value===1?'A'+card.suit:card.value===11?'J'+card.suit:card.value===12?'Q'+card.suit:card.value===13?'K'+card.suit:card.value+card.suit;
       if(rowIndex<6 && (!pyramidData[rowIndex+1][colIndex].removed || !pyramidData[rowIndex+1][colIndex+1].removed)) cardDiv.classList.add('hidden');
       if(card.removed){ cardDiv.classList.add('removing'); setTimeout(()=>render(),500);}
+      makeDraggable(cardDiv, card);
       cardDiv.onclick=()=>{ if(!card.removed && !cardDiv.classList.contains('hidden')) selectCard(card); };
       pyramidDiv.appendChild(cardDiv);
     });
   });
   // 山札
-  stockDiv.innerHTML=''; if(stock.length>0){ const c=document.createElement('div'); c.className='card small'; c.style.width=cardW*0.8+'px'; c.style.height=cardH*0.8+'px'; c.textContent='山札'; stockDiv.appendChild(c);}
+  stockDiv.innerHTML=''; if(stock.length>0){ const c=document.createElement('div'); c.className='card small'; c.textContent='山札'; makeDraggable(c,{type:'stock'}); stockDiv.appendChild(c);}
   // 捨て札
-  wasteDiv.innerHTML=''; if(waste.length>0){ const top=waste[waste.length-1]; const c=document.createElement('div'); c.className='card small'; c.style.width=cardW*0.8+'px'; c.style.height=cardH*0.8+'px'; c.textContent=top.value===1?'A'+top.suit:top.value===11?'J'+top.suit:top.value===12?'Q'+top.suit:top.value===13?'K'+top.suit:top.value+top.suit; wasteDiv.appendChild(c);}
+  wasteDiv.innerHTML=''; if(waste.length>0){ const top=waste[waste.length-1]; const c=document.createElement('div'); c.className='card small'; c.textContent=top.value===1?'A'+top.suit:top.value===11?'J'+top.suit:top.value===12?'Q'+top.suit:top.value===13?'K'+top.suit:top.value+top.suit; makeDraggable(c,top); wasteDiv.appendChild(c);}
   stockCountDiv.textContent='山札残り:'+stock.length;
 }
 
 function selectCard(card){
-  if(card.value===13) removeCard(card);
+  if(card.value===13){ removeCard(card); score+=10; render(); return; }
+  selected.push(card);
+  if(selected.length===2){ if(selected[0].value+selected[1].value===13){ removeCard(selected[0]); removeCard(selected[1]); score+=20; } selected=[]; render(); }
+}
+
+function removeCard(card){ card.removed=true; render(); }
+
+// ヒント
+hintBtn.onclick=()=>{
+  document.querySelectorAll('.card.hint').forEach(c=>c.classList.remove('hint'));
+  const visible=[]; pyramidData.flat().forEach(c=>{if(!c.removed && canRemove(c)) visible.push(c);});
+  for(let i=0;i<visible.length;i++){
+    if(visible[i].value===13){ highlightCard(visible[i]); return;}
+    for(let j=i+1;j<visible.length;j++){
+      if(visible[i].value+visible[j].value===13){ highlightCard(visible[i]); highlightCard(visible[j]); return;}
+    }
+  }
+}
+function highlightCard(card){ const divs=document.querySelectorAll('.card'); divs.forEach(d=>{ if(d.textContent.includes(card.suit) && !d.classList.contains('hidden')) d.classList.add('hint'); }); }
+
+function canRemove(card){
+  let row,col; pyramidData.forEach((r,ri)=>{ r.forEach((c,ci)=>{ if(c===card){ row=ri; col=ci; } })});
+  if(row===6) return true;
+  return pyramidData[row+1][col].removed && pyramidData[row+1][col+1].removed;
+}
+
+// 自動移動
+autoBtn.onclick=()=>{
+  let changed=true;
+  while(changed){
+    changed=false;
+    const visible=pyramidData.flat().filter(c=>!c.removed && canRemove(c));
+    for(let i=0;i<visible.length;i++){
+      if(visible[i].value===13){ removeCard(visible[i]); score+=10; changed=true; break;}
+      for(let j=i+1;j<visible.length;j++){
+        if(visible[i].value+visible[j].value===13){ removeCard(visible[i]); removeCard(visible[j]); score+=20; changed=true; break;}
+      }
+      if(changed) break;
+    }
+  }
   render();
 }
-function removeCard(card){ card.removed=true; }
 
+// ドラッグ＆ドロップ
+function makeDraggable(element, card){
+  let offsetX, offsetY;
+  element.onpointerdown=(e)=>{
+    e.preventDefault();
+    offsetX=e.clientX-element.offsetLeft;
+    offsetY=e.clientY-element.offsetTop;
+    element.setPointerCapture(e.pointerId);
+  };
+  element.onpointermove=(e)=>{
+    if(e.pressure>0){ element.style.left=(e.clientX-offsetX)+'px'; element.style.top=(e.clientY-offsetY)+'px'; }
+  };
+  element.onpointerup=(e)=>{
+    element.releasePointerCapture(e.pointerId);
+    const cards=document.querySelectorAll('.card');
+    for(const cDiv of cards){
+      if(cDiv===element) continue;
+      const rRect=cDiv.getBoundingClientRect();
+      if(e.clientX>rRect.left && e.clientX<rRect.right && e.clientY>rRect.top && e.clientY<rRect.bottom){
+        const cObj=pyramidData.flat().find(c=>cDiv.textContent.includes(c.suit));
+        if(cObj && canRemove(cObj)){
+          if(card.value+ cObj.value===13){ removeCard(card); removeCard(cObj); score+=20; render(); return;}
+        }
+      }
+    }
+    render();
+  };
+}
+
+// 山札
 drawBtn.onclick=()=>{
   if(stock.length>0){ waste.push(stock.pop()); } else { stock=waste.reverse(); waste=[]; }
   render();
 }
 resetBtn.onclick=newGame;
-
 window.addEventListener('resize', render);
 newGame();
 </script>
