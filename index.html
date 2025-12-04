@@ -21,7 +21,7 @@ h1 { margin:20px 0 10px; }
 .controls { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-bottom:10px; }
 #stock-container { display:flex; justify-content:center; margin:15px 0; gap:10px; }
 #stock,#waste { display:flex; gap:10px; min-height:80px; }
-.card.small { transition:all 0.3s; border-radius:6px; text-align:center; width:50px; height:75px; background:red; color:white;}
+.card.small { transition:all 0.3s; border-radius:6px; text-align:center; width:60px; height:90px; background:red; color:white;}
 button { padding:6px 12px; font-size:0.95rem; border-radius:6px; border:none; background:gold; color:#0b2946; cursor:pointer;}
 button:hover { background:#ffc700;}
 </style>
@@ -88,10 +88,18 @@ function render(){
     });
   });
 
-  // 山札
-  stockDiv.innerHTML=''; if(stock.length>0){ const c=document.createElement('div'); c.className='card small'; c.textContent='山札'; makeDraggable(c,{type:'stock'}); stockDiv.appendChild(c);}
-  // 捨て札
-  wasteDiv.innerHTML=''; if(waste.length>0){ const top=waste[waste.length-1]; const c=document.createElement('div'); c.className='card small'; c.textContent=top.value===1?'A'+top.suit:top.value===11?'J'+top.suit:top.value===12?'Q'+top.suit:top.value===13?'K'+top.suit:top.value+top.suit; makeDraggable(c,top); wasteDiv.appendChild(c);}
+  // 山札はドラッグ不可
+  stockDiv.innerHTML=''; if(stock.length>0){ const c=document.createElement('div'); c.className='card small'; c.textContent='山札'; stockDiv.appendChild(c);}
+
+  // 捨て札のトップカードだけドラッグ可能
+  wasteDiv.innerHTML=''; if(waste.length>0){
+    const top=waste[waste.length-1];
+    const c=document.createElement('div'); c.className='card small';
+    c.textContent=top.value===1?'A'+top.suit:top.value===11?'J'+top.suit:top.value===12?'Q'+top.suit:top.value===13?'K'+top.suit:top.value+top.suit;
+    makeDraggable(c, top);
+    wasteDiv.appendChild(c);
+  }
+
   stockCountDiv.textContent='山札残り:'+stock.length;
 }
 
@@ -170,11 +178,12 @@ function makeDraggable(element, card){
   };
 }
 
-// 山札
+// 山札ボタン
 drawBtn.onclick=()=>{
   if(stock.length>0){ waste.push(stock.pop()); } else { stock=waste.reverse(); waste=[]; }
   render();
 }
+
 resetBtn.onclick=newGame;
 window.addEventListener('resize', render);
 newGame();
