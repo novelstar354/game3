@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ピラミッドソリティア 完全版＋ドラッグ＆タップ対応</title>
+<style>
+body { background:#0b2946; color:white; font-family:sans-serif; display:flex; flex-direction:column; align-items:center; margin:0; padding:20px;}
+h1 { margin-bottom:10px; }
+#message { font-size:1.5rem; margin-bottom:10px; color:gold; transition:transform 0.5s,opacity 0.5s; }
+#score,#timer,#stock-count,#highscore{font-size:1.2rem;margin-bottom:5px;}
+.game-area { display:flex; flex-direction:column; align-items:center; gap:20px; position:relative;}
+.pyramid { display:flex; flex-direction:column; align-items:center; gap:10px; position:relative; }
+.row { display:flex; gap:10px; }
+.card { width:60px; height:90px; background:white; color:black; border-radius:8px; display:flex; justify-content:center; align-items:center; font-weight:bold; box-shadow:0 4px 6px rgba(0,0,0,0.3); cursor:pointer; user-select:none; transition:transform 0.3s,opacity 0.3s; opacity:1; position:absolute; touch-action: none;}
+.card.hidden { visibility:hidden; }
+.card.selected { transform:translateY(-10px); box-shadow:0 6px 10px rgba(255,255,255,0.6);}
+.card.removing { animation:removeCard 0.5s forwards;}
+.card.hint { border:2px solid red;}
+@keyframes removeCard {0%{opacity:1; transform:scale(1);}100%{opacity:0; transform:scale(0);}}
+@keyframes appearCard {0%{opacity:0; transform:translateY(50px);}100%{opacity:1; transform:translateY(0);}}
+.card.appear { animation:appearCard 0.5s ease forwards;}
+@keyframes messagePop {0%{opacity:0; transform:scale(0.5);}50%{opacity:1; transform:scale(1.2);}100%{opacity:0; transform:scale(1);}}
+.controls { display:flex; gap:15px; align-items:center; position:relative; }
+#stock,#waste { display:flex; gap:10px; position:relative; height:90px; }
+.card.small { width:50px; height:75px; transition:transform 0.3s; }
+button { padding:6px 12px; font-size:0.95rem; border-radius:6px; border:none; background:gold; color:#0b2946; cursor:pointer;}
+button:hover { background:#ffc700;}
+</style>
+</head>
+<body>
+<h1>ピラミッドソリティア</h1>
+<div id="message"></div>
+<div id="score">スコア: 0</div>
+<div id="highscore">ハイスコア: 0</div>
+<div id="timer">時間: 0秒</div>
+<div id="stock-count">山札残り: 0</div>
+<div class="game-area">
+  <div class="pyramid" id="pyramid"></div>
+  <div class="controls">
+    <div id="stock"></div>
+    <button id="draw">山札からめくる</button>
+    <div id="waste"></div>
+    <button id="reset">新しいゲーム</button>
+    <button id="auto">自動配置</button>
+    <button id="hint">ヒント</button>
+  </div>
+</div>
+<script>
+const suits=['♠','♥','♦','♣'], values=[1,2,3,4,5,6,7,8,9,10,11,12,13];
+let deck=[], pyramidData=[], stock=[], waste=[], selected=[], score=0, time=0, timerInterval;
+const pyramidDiv=document.getElementById('pyramid'), stockDiv=document.getElementById('stock'), wasteDiv=document.getElementById('waste');
+const drawBtn=document.getElementById('draw'), resetBtn=document.getElementById('reset'), autoBtn=document.getElementById('auto'), hintBtn=document.getElementById('hint');
+const messageDiv=document.getElementById('message'), scoreDiv=document.getElementById('score'), timerDiv=document.getElementById('timer');
+const stockCountDiv=document.getElementById('stock-count'), highscoreDiv=document.getElementById('highscore');
+
+function getHighScore(){ return parseInt(localStorage.getItem('pyramidHighScore'))||0;}
+function setHighScore(v){ localStorage.setItem('pyramidHighScore',v); }
+
+function newGame(){
+  clearInterval(timerInterval);
+  time=0; score=0; scoreDiv.textContent='スコア:0';
+  highscoreDiv.textContent='ハイスコア:'+getHighScore(); messageDiv.textContent='';
+  timerInterval=setInterval(()=>{time++; timerDiv.textContent='時間:'+time+'秒';},1000);
+  deck=[]; for(let s of suits) for(let v of values) deck.push({value:v,suit:s,removed:false});
+  deck.sort(()=>Math.random()-0.5);
+  pyramidData=[]; let index=0; for(let r=0;r<7;r++){ let row=[]; for(let c=0;c<=r;c++){ row.push(deck[index++]); } pyramidData.push(row);}
+  stock=deck.slice(28); waste=[]; selected=[];
+  render(true);
+}
+
+function render(animate=false){
+  pyramidDiv.innerHTML='';
+  pyramidData.forEach((row,rowIndex)=>{
+    row.forEach((card,colIndex)=>{
+      const cardDiv=document.createElement('div'); cardDiv.className='card';
+      cardDiv.style.top=(rowIndex*100)+'px'; cardDiv.style.left=(colIndex*70-(rowIndex*35))+'px';
+      if(animate) cardDiv.classList.add('appear');
+      cardDiv.textContent=card.value===1?'A'+card.suit:card.value===11?'J'+card.suit:card.value===12?'Q'+card.suit:card.value===13?'K'+card.suit:card.value+card.suit;
+      if(rowIndex<6 && (!pyramidData[rowIndex+1][colIndex].removed || !pyramidData[rowIndex+1][colIndex+1].removed)) cardDiv.classList.add('hidden');
+      if(card.removed){ cardDiv.classList.add('removing'); setTimeout(()=>render(),500);}
+      cardDiv.onclick=()=>{ if(!card.removed && !cardDiv.classList.contains('hidden')) selectCard(card); };
+      makeDraggable(cardDiv,card);
+      if(selected.includes(card)) cardDiv.classList.add('selected');
+      pyramidDiv.appendChild(cardDiv);
+    });
+  });
+  stockDiv.innerHTML=''; if(stock.length>0){ const c=document.createElement('div'); c.className='card small'; if(animate)c.classList.add('appear'); c.textContent='山札'; makeDraggable(c,{type:'stock'}); stockDiv.appendChild(c);}
+  wasteDiv.innerHTML=''; if(waste.length>0){ const top=waste[waste.length-1]; const c=document.createElement('div'); c.className='card small'; if(animate)c.classList.add('appear'); c.textContent=top.value===1?'A'+top.suit:top.value===11?'J'+top.suit:top.value===12?'Q'+top.suit:top.value===13?'K'+top.suit:top.value+top.suit; c.onclick=()=>selectCard(top); makeDraggable(c,top); if(selected.includes(top)) c.classList.add('selected'); wasteDiv.appendChild(c);}
+  stockCountDiv.textContent='山札残り: '+stock.length;
+  checkWin();
+}
+
+// 選択・削除
+function selectCard(card){ if(selected.includes(card)) selected=selected.filter(c=>c!==card); else selected.push(card);
+let removed=[]; if(selected.length===1 && selected[0].value===13){ removeCard(selected[0]); removed.push(selected[0]); selected=[];}
+else if(selected.length===2){ const sum=selected[0].value+selected[1].value; if(sum===13){ removeCard(selected[0]); removeCard(selected[1]); removed.push(selected[0],selected[1]); } selected=[];}
+if(removed.length>0){ score+=removed.length*10; scoreDiv.textContent='スコア:'+score;} render(); }
+function removeCard(card){ card.removed=true; }
+
+drawBtn.onclick=()=>{ if(stock.length>0){ waste.push(stock.pop()); animateMove(stockDiv,wasteDiv);} else { stock=waste.reverse(); waste=[]; animateMove(wasteDiv,stockDiv); } render();}
+resetBtn.onclick=newGame;
+
+// 自動配置
+autoBtn.onclick=()=>{ let moved=false; do{ moved=false; const visible=[]; pyramidData.flat().forEach(c=>{if(!c.removed && canRemove(c)) visible.push(c);}); for(let i=0;i<visible.length;i++){ if(visible[i].value===13){ removeCard(visible[i]); moved=true; continue;} for(let j=i+1;j<visible.length;j++){ if(visible[i].value+visible[j].value===13){ removeCard(visible[i]); removeCard(visible[j]); moved=true; break;}}}}while(moved); render(); }
+// ヒント
+hintBtn.onclick=()=>{ document.querySelectorAll('.card.hint').forEach(c=>c.classList.remove('hint')); const visible=[]; pyramidData.flat().forEach(c=>{if(!c.removed && canRemove(c)) visible.push(c);}); for(let i=0;i<visible.length;i++){ if(visible[i].value===13){ highlightCard(visible[i]); return;} for(let j=i+1;j<visible.length;j++){ if(visible[i].value+visible[j].value===13){ highlightCard(visible[i]); highlightCard(visible[j]); return;}}}}
+function highlightCard(card){ const divs=document.querySelectorAll('.card'); divs.forEach(d=>{if(d.textContent.includes(card.suit)) d.classList.add('hint');});}
+function canRemove(card){ let row,col; pyramidData.forEach((r,ri)=>{ r.forEach((c,ci)=>{ if(c===card){ row=ri; col=ci; } })}); if(row===6) return true; return pyramidData[row+1][col].removed && pyramidData[row+1][col+1].removed; }
+function checkWin(){ const remaining=pyramidData.flat().filter(c=>!c.removed); if(remaining.length===0){ messageDiv.textContent='🎉 勝利！ 🎉'; messageDiv.style.animation='messagePop 1s forwards'; clearInterval(timerInterval); if(score>getHighScore()) setHighScore(score); highscoreDiv.textContent='ハイスコア:'+getHighScore();} else messageDiv.style.animation=''; }
+
+// 簡易アニメ
+function animateMove(fromDiv,toDiv){ const card=fromDiv.querySelector('.card'); if(!card) return; const clone=card.cloneNode(true); document.body.appendChild(clone); const fromRect=card.getBoundingClientRect(); const toRect=toDiv.getBoundingClientRect(); clone.style.position='absolute'; clone.style.top=fromRect.top+'px'; clone.style.left=fromRect.left+'px'; clone.style.transition='top 0.5s,left 0.5s'; setTimeout(()=>{ clone.style.top=toRect.top+'px'; clone.style.left=toRect.left+'px';},10); setTimeout(()=>{ clone.remove(); render();},510);}
+
+// ドラッグ対応
+function makeDraggable(element,card){
+  let offsetX,offsetY;
+  element.onpointerdown=(e)=>{
+    e.preventDefault(); offsetX=e.clientX-element.offsetLeft; offsetY=e.clientY-element.offsetTop;
+    element.setPointerCapture(e.pointerId);
+  };
+  element.onpointermove=(e)=>{
+    if(e.pressure>0){ element.style.left=(e.clientX-offsetX)+'px'; element.style.top=(e.clientY-offsetY)+'px'; }
+  };
+  element.onpointerup=(e)=>{ element.releasePointerCapture(e.pointerId);}
+}
+
+newGame();
+</script>
+</body>
+</html>
