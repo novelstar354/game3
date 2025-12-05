@@ -3,8 +3,17 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
-<title>かんたんシューティング（敵種類＋ボス＋アニメ）</title>
+   <link rel="icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQoZ5nF2nh3MGMh1FdK-P-WiE6f-TJUeZJDI1QVThw-Ew&s=10" sizes="16×16" type="image/png" />  
+<title>シューティング</title>
 <style>
+     footer {
+           padding: 30px;
+           text-align: center;
+           font-size: 0.85rem;
+           color: rgba(255,255,255,0.5);
+           border-top: 1px solid rgba(255,255,255,0.1);
+           margin-top: 60px;
+     }
   :root{ --bg:#0b1220; --accent:#39f; }
   html,body{margin:0;height:100%;background:#071021;color:#eef;font-family:sans-serif;}
   .wrap{max-width:900px;margin:auto;padding:10px;}
@@ -21,7 +30,7 @@
 <body>
 <div class="wrap">
 <header>
-  <h2>かんたんシューティング</h2>
+  <h2>シューティング</h2>
   <div>
     <button id="startBtn">開始</button>
     <button id="restartBtn">リスタート</button>
@@ -39,6 +48,10 @@
   <div class="touch-btn" id="rightBtn">▶</div>
 </div>
 </div>
+     <footer>
+       © 2025 STAR CORPORATION - All Rights Reserved.
+     </footer>
+  
 <script>
 (() =>{
   const canvas=document.getElementById('game');
