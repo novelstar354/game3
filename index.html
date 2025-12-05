@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
-   <link rel="icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQoZ5nF2nh3MGMh1FdK-P-WiE6f-TJUeZJDI1QVThw-Ew&s=10" sizes="16×16" type="image/png" />  
-<title>シューティング</title>
+ <link rel="icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQoZ5nF2nh3MGMh1FdK-P-WiE6f-TJUeZJDI1QVThw-Ew&s=10" sizes="16×16" type="image/png" />     
+<title>ブロックシューティング</title>
 <style>
-     footer {
+      footer {
            padding: 30px;
            text-align: center;
            font-size: 0.85rem;
            color: rgba(255,255,255,0.5);
            border-top: 1px solid rgba(255,255,255,0.1);
            margin-top: 60px;
-     }
+      }
   :root{ --bg:#0b1220; --accent:#39f; }
   html,body{margin:0;height:100%;background:#071021;color:#eef;font-family:sans-serif;}
   .wrap{max-width:900px;margin:auto;padding:10px;}
@@ -30,12 +30,13 @@
 <body>
 <div class="wrap">
 <header>
-  <h2>シューティング</h2>
+  <h2>ブロックシューティング</h2>
   <div>
     <button id="startBtn">開始</button>
     <button id="restartBtn">リスタート</button>
   </div>
 </header>
+<button id="pauseBtn" style="background:#444;color:#fff;margin-top:6px;padding:8px 12px;border-radius:6px;border:none;cursor:pointer;">⏸ ポーズ</button>
 <canvas id="game"></canvas>
 <div class="hud">
   <div>スコア: <span id="score">0</span></div>
@@ -48,10 +49,10 @@
   <div class="touch-btn" id="rightBtn">▶</div>
 </div>
 </div>
-     <footer>
+      <footer>
        © 2025 STAR CORPORATION - All Rights Reserved.
-     </footer>
-  
+   </footer>
+
 <script>
 (() =>{
   const canvas=document.getElementById('game');
@@ -71,7 +72,7 @@
   let paused=false;
   let last=0;
   let score=0,life=3,level=1;
-  const bullets=[],enemies=[],enemyBullets=[];
+  const bullets=[],enemies=[],enemyBullets=[],lasers=[];
 
   const player={x:150,y:0,w:40,h:28,speed:260,cooldown:0};
 
@@ -95,6 +96,8 @@
   }
 
   function spawnBoss(){
+    enemies.push({x:60,y:-200,w:200,h:120,speed:40,hp:80+level*50,type:"boss",fireCd:0.8,laserCd:3});
+  }(){
     enemies.push({x:60,y:-200,w:200,h:120,speed:40,hp:80+level*50,type:"boss",fireCd:0.8});
   }
 
@@ -130,6 +133,16 @@
         e.fireCd=e.type=="boss"?0.3:1+Math.random();
       }
 
+      // レーザー攻撃（ボス用）
+      if(e.type==="boss"){
+        e.laserCd-=dt;
+        if(e.laserCd<=0){
+          lasers.push({x:e.x+e.w/2-2,y:e.y+e.h,width:4,height:canvas.height});
+          e.laserCd=5;
+        }
+      }();
+      }
+
       if(coll(e,player)){
         enemies.splice(i,1);
         life--; if(life<=0)running=false;
@@ -138,12 +151,17 @@
       bullets.forEach((b,j)=>{
         if(coll(b,e)){
           bullets.splice(j,1);
-          e.hp--; if(e.hp<=0){enemies.splice(i,1);score+= e.type=="boss"?200:10;}
+          e.hp--; if(e.hp<=0){ spawnExplosion(e.x, e.y);{enemies.splice(i,1);score+= e.type=="boss"?200:10;}
         }
       });
     });
 
-    enemyBullets.forEach((b,i)=>{
+    enemyBullets.forEach(b=>{ctx.fillStyle="#f55";ctx.fillRect(b.x,b.y,b.w,b.h);} );
+
+    lasers.forEach(l=>{
+      ctx.fillStyle="#0ff";
+      ctx.fillRect(l.x,l.y,l.width,l.height);
+    });((b,i)=>{
       b.y+=b.speed*dt;
       if(b.y>canvas.height)enemyBullets.splice(i,1);
       if(coll(b,player)){
@@ -152,7 +170,22 @@
       }
     });
 
-    level=1+Math.floor(score/100);
+    lasers.forEach((l,i)=>{
+      if(coll(l,player)){
+        lasers.splice(i,1);
+        life--;
+        if(life<=0)running=false;
+      }
+    });((b,i)=>{
+      b.y+=b.speed*dt;
+      if(b.y>canvas.height)enemyBullets.splice(i,1);
+      if(coll(b,player)){
+        enemyBullets.splice(i,1);
+        life--; if(life<=0)running=false;
+      }
+    });
+
+    level=Math.min(5,1+Math.floor(score/100));(score/100);
   }
 
   function draw(){
@@ -164,6 +197,17 @@
     ctx.fillRect(player.x,player.y,player.w,player.h);
 
     ctx.fillStyle="white";
+
+    // --- 爆発描画 ---
+    explosions.forEach((ex,i)=>{
+      const size = 20 + ex.frame*3;
+      ctx.fillStyle = `rgba(255, ${200 - ex.frame*10}, 0, ${1 - ex.frame/12})`;
+      ctx.beginPath();
+      ctx.arc(ex.x + ex.w/2, ex.y + ex.h/2, size, 0, Math.PI*2);
+      ctx.fill();
+      ex.frame++;
+      if(ex.frame > ex.max) explosions.splice(i,1);
+    });
     bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.w,b.h));
 
     enemyBullets.forEach(b=>{ctx.fillStyle="#f55";ctx.fillRect(b.x,b.y,b.w,b.h);});
@@ -216,7 +260,16 @@
 
   // UI
   document.getElementById('startBtn').onclick=()=>running=true;
+  document.getElementById('pauseBtn').onclick=()=>paused=!paused;
   document.getElementById('restartBtn').onclick=()=>{reset();running=true;};
+
+})();
+// --- 爆発アニメ管理 ---
+  const explosions = [];
+
+  function spawnExplosion(x,y){
+    explosions.push({x,y,frame:0,max:12});
+  }
 
 })();
 </script>
