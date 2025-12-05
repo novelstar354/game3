@@ -54,10 +54,11 @@
   window.addEventListener('resize',fit);
   fit();
 
-  let running=false,last=0;
+  let running=false;
+  let paused=false;
+  let last=0;
   let score=0,life=3,level=1;
-  const bullets=[],enemies=[],effects=[];
-  let boss=null,bossTimer=0;
+  const bullets=[],enemies=[],enemyBullets=[];
 
   const player={x:150,y:0,w:40,h:28,speed:260,cooldown:0};
 
@@ -65,40 +66,30 @@
 
   function reset(){
     score=0;life=3;level=1;
-    bullets.length=0;enemies.length=0;effects.length=0;
-    boss=null;bossTimer=0;
+    bullets.length=0;enemies.length=0;enemyBullets.length=0;
     player.x=canvas.width/(window.devicePixelRatio||1)/2-player.w/2;
     player.y=canvas.height/(window.devicePixelRatio||1)-70;
   }
   reset();
 
-  // --- エフェクト（爆発アニメ） ---
-  function addEffect(x,y){
-    effects.push({x,y,r:5,max:20,alpha:1});
-  }
-
-  // --- 敵生成（3種類＋たまに高速タイプ） ---
   function spawn(){
-    const type=Math.random();
-    const x=Math.random()*(canvas.width/(window.devicePixelRatio||1)-40)+10;
-
-    // 小型（速い）
-    if(type<0.4){ enemies.push({type:'small',x,y:-30,w:22,h:18,speed:120+level*20,hp:1}); }
-    // 中型（標準）
-    else if(type<0.8){ enemies.push({type:'mid',x,y:-40,w:30,h:24,speed:70+level*15,hp:2}); }
-    // 大型（遅くて固い）
-    else{ enemies.push({type:'big',x,y:-50,w:40,h:34,speed:40+level*10,hp:3}); }
+    const w=30+Math.random()*25;
+    const type=Math.random()<0.5?"normal":"fast";
+    const hp= type=="normal" ? 1+Math.floor(level/2) : 1;
+    const sp= type=="normal" ? 60+level*20 : 120+level*30;
+    const x=Math.random()*(canvas.width/(window.devicePixelRatio||1)-w-10)+5;
+    enemies.push({x,y:-40,w,h:w*0.7,speed:sp,hp,type,fireCd:1+Math.random()*1.5});
   }
 
-  // --- ボス登場 ---
   function spawnBoss(){
-    const W=canvas.width/(window.devicePixelRatio||1);
-    boss={x:W/2-80,y:-150,w:160,h:120,hp:60+level*20,speed:40,mode:'enter'};
+    enemies.push({x:60,y:-200,w:200,h:120,speed:40,hp:80+level*50,type:"boss",fireCd:0.8});
   }
 
   function coll(a,b){return !(a.x+a.w<b.x||a.x>b.x+b.w||a.y+a.h<b.y||a.y>b.y+b.h);}  
 
   function update(dt){
+    if(paused)return;
+
     if(keys.left)player.x-=player.speed*dt;
     if(keys.right)player.x+=player.speed*dt;
     const max=canvas.width/(window.devicePixelRatio||1)-player.w;
@@ -108,68 +99,44 @@
     if(player.cooldown>0)player.cooldown-=dt;
     if(keys.fire&&player.cooldown<=0){
       bullets.push({x:player.x+player.w/2-3,y:player.y-12,w:6,h:12,speed:480});
-      player.cooldown=0.2;
+      player.cooldown=0.25;
     }
 
     bullets.forEach((b,i)=>{b.y-=b.speed*dt;if(b.y<-20)bullets.splice(i,1);});
 
-    // 敵出現（ボス前のみ）
-    if(!boss){
-      if(Math.random()<0.03*level)spawn();
-    }
+    if(Math.random()<0.02*level)spawn();
+    if(score>200 && !enemies.some(e=>e.type=="boss")) spawnBoss();
 
-    // 敵更新
     enemies.forEach((e,i)=>{
       e.y+=e.speed*dt;
+
+      // 敵の攻撃
+      e.fireCd-=dt;
+      if(e.fireCd<=0){
+        enemyBullets.push({x:e.x+e.w/2-4,y:e.y+e.h,w:8,h:12,speed:250});
+        e.fireCd=e.type=="boss"?0.3:1+Math.random();
+      }
+
       if(coll(e,player)){
         enemies.splice(i,1);
         life--; if(life<=0)running=false;
-        addEffect(player.x,player.y);
       }
+
       bullets.forEach((b,j)=>{
         if(coll(b,e)){
           bullets.splice(j,1);
-          e.hp--; addEffect(b.x,b.y);
-          if(e.hp<=0){ enemies.splice(i,1); score+=10; }
+          e.hp--; if(e.hp<=0){enemies.splice(i,1);score+= e.type=="boss"?200:10;}
         }
       });
     });
 
-    // ボス出現条件
-    if(score>0 && score%200>=0 && bossTimer<=0 && !boss){
-      bossTimer=20; // 次回ボス出現待機
-      spawnBoss();
-    }
-
-    if(bossTimer>0)bossTimer-=dt;
-
-    // ボス更新
-    if(boss){
-      if(boss.mode==='enter'){
-        boss.y+=boss.speed*dt;
-        if(boss.y>40)boss.mode='fight';
-      } else if(boss.mode==='fight'){
-        boss.x += Math.sin(Date.now()*0.001)*2;
+    enemyBullets.forEach((b,i)=>{
+      b.y+=b.speed*dt;
+      if(b.y>canvas.height)enemyBullets.splice(i,1);
+      if(coll(b,player)){
+        enemyBullets.splice(i,1);
+        life--; if(life<=0)running=false;
       }
-
-      if(coll(boss,player)){
-        life--; addEffect(player.x,player.y);
-        if(life<=0)running=false;
-      }
-
-      bullets.forEach((b,j)=>{
-        if(coll(b,boss)){
-          bullets.splice(j,1);
-          boss.hp--; addEffect(b.x,b.y);
-          if(boss.hp<=0){ boss=null; score+=200; }
-        }
-      });
-    }
-
-    // エフェクト更新
-    effects.forEach((ef,i)=>{
-      ef.r+=0.8; ef.alpha-=0.03;
-      if(ef.alpha<=0)effects.splice(i,1);
     });
 
     level=1+Math.floor(score/100);
@@ -180,39 +147,26 @@
     const H=canvas.height/(window.devicePixelRatio||1);
     ctx.clearRect(0,0,W,H);
 
-    // プレイヤー
     ctx.fillStyle="#9ef";
     ctx.fillRect(player.x,player.y,player.w,player.h);
 
-    // 弾
     ctx.fillStyle="white";
     bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.w,b.h));
 
-    // 敵描画（種類ごとに色変更）
+    enemyBullets.forEach(b=>{ctx.fillStyle="#f55";ctx.fillRect(b.x,b.y,b.w,b.h);});
+
     enemies.forEach(e=>{
-      if(e.type==='small') ctx.fillStyle="#ff8";
-      else if(e.type==='mid') ctx.fillStyle="#f85";
-      else ctx.fillStyle="#f44";
+      ctx.fillStyle=e.type=="boss"?"#f0f":"#fb5";
       ctx.fillRect(e.x,e.y,e.w,e.h);
     });
 
-    // ボス描画
-    if(boss){
-      ctx.fillStyle="#8ff";
-      ctx.fillRect(boss.x,boss.y,boss.w,boss.h);
+    if(paused){
+      ctx.fillStyle="rgba(0,0,0,0.5)";
+      ctx.fillRect(0,0,W,H);
       ctx.fillStyle="#fff";
-      ctx.fillRect(boss.x,boss.y-10,(boss.hp/ (60+level*20))*boss.w,6);
+      ctx.font="32px sans-serif";
+      ctx.fillText("PAUSED",W/2-60,H/2);
     }
-
-    // エフェクト（爆発）
-    effects.forEach(ef=>{
-      ctx.globalAlpha=ef.alpha;
-      ctx.fillStyle="orange";
-      ctx.beginPath();
-      ctx.arc(ef.x,ef.y,ef.r,0,Math.PI*2);
-      ctx.fill();
-      ctx.globalAlpha=1;
-    });
   }
 
   function loop(t){
@@ -223,12 +177,13 @@
   }
   requestAnimationFrame(loop);
 
-  // キーボード
+  // --- キーボード操作 ---
   window.addEventListener('keydown',e=>{
     if(e.key==='ArrowLeft')keys.left=true;
     if(e.key==='ArrowRight')keys.right=true;
     if(e.code==='Space')keys.fire=true;
     if(e.key==='Enter')running=true;
+    if(e.key.toLowerCase()==='p')paused=!paused;
   });
   window.addEventListener('keyup',e=>{
     if(e.key==='ArrowLeft')keys.left=false;
@@ -236,7 +191,7 @@
     if(e.code==='Space')keys.fire=false;
   });
 
-  // タッチ
+  // --- スマホ操作 ---
   function bindTouch(id,down,up){
     const el=document.getElementById(id);
     el.addEventListener('touchstart',e=>{e.preventDefault();down();});
@@ -249,6 +204,7 @@
   // UI
   document.getElementById('startBtn').onclick=()=>running=true;
   document.getElementById('restartBtn').onclick=()=>{reset();running=true;};
+
 })();
 </script>
 </body>
