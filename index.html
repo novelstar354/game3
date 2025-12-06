@@ -2,196 +2,203 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>表示確認用シューティング（矩形版）</title>
+ <link rel="icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQoZ5nF2nh3MGMh1FdK-P-WiE6f-TJUeZJDI1QVThw-Ew&s=10" sizes="16×16" type="image/png" />    
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+<title>ブロックシューティング</title>
 <style>
-  html,body{height:100%;margin:0;background:#071021;color:#fff;font-family:sans-serif}
-  .wrap{max-width:900px;margin:12px auto;padding:12px}
-  canvas{width:100%;height:60vh;background:#00131a;display:block;border-radius:8px}
-  .hud{display:flex;gap:12px;margin-top:8px;align-items:center}
-  button{padding:8px 12px;border-radius:6px;border:0;background:#39f;color:#012;font-weight:700;cursor:pointer}
+     footer {
+           padding: 30px;
+           text-align: center;
+           font-size: 0.85rem;
+           color: rgba(255,255,255,0.5);
+           border-top: 1px solid rgba(255,255,255,0.1);
+           margin-top: 60px;
+     }
+  :root{--bg:#071021;--accent:#39f;--muted:#94a6b6}
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#021026);color:#eef;font-family:system-ui, 'Noto Sans JP', sans-serif}
+  .wrap{max-width:1100px;margin:14px auto;padding:12px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  button{background:var(--accent);color:#051;padding:8px 12px;border-radius:8px;border:0;font-weight:700;cursor:pointer}
+  canvas{width:100%;height:66vh;border-radius:12px;background:#00131a;display:block}
+  .hud{display:flex;gap:12px;align-items:center;margin-top:10px;flex-wrap:wrap}
+  .hud .item{background:rgba(255,255,255,0.02);padding:8px 10px;border-radius:8px;font-size:14px}
+  .touch-pad{display:flex;gap:10px;justify-content:center;margin-top:10px}
+  .pad-btn{background:rgba(255,255,255,0.04);padding:12px 16px;border-radius:10px;font-size:18px}
+  @media(min-width:800px){ .touch-pad{display:none} }
+  .overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6)}
+  .box{background:linear-gradient(180deg,#061226,#081523);padding:16px;border-radius:12px;max-width:820px;width:94%}
+  .row{display:flex;gap:8px;align-items:center;margin-top:8px}
+  input[type=text]{padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);background:transparent;color:#fff}
+  footer{text-align:center;color:var(--muted);padding:10px;margin-top:10px}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:6px 8px;text-align:left}
+  th{color:var(--muted)}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h2>表示確認シューティング</h2>
-  <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-    <button id="startBtn">Start</button>
-    <button id="pauseBtn">Pause</button>
-    <button id="restartBtn">Restart</button>
-  </div>
+  <header>
+    <h1>完全版 シューティング — ランキング付き</h1>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button id="startBtn">Start</button>
+      <button id="pauseBtn">⏸ Pause</button>
+      <button id="restartBtn">↺ Restart</button>
+      <button id="viewRankingBtn" class="ghost">ランキング</button>
+      <label style="display:flex;align-items:center;gap:6px;color:var(--muted)"><input id="autoFire" type="checkbox"> Auto</label>
+    </div>
+  </header>
 
   <canvas id="game"></canvas>
 
   <div class="hud">
-    <div>Score: <span id="score">0</span></div>
-    <div>Life: <span id="life">3</span></div>
-    <div style="opacity:.7">Controls: ← → / Space = shoot / P = pause</div>
+    <div class="item">Score: <strong id="score">0</strong></div>
+    <div class="item">Life: <strong id="life">3</strong></div>
+    <div class="item">Stage: <strong id="stage">1</strong>/<span id="maxStage">3</span></div>
+    <div class="item">Level: <strong id="level">1</strong></div>
+  </div>
+
+  <div class="touch-pad">
+    <div class="pad-btn" id="leftBtn">◀</div>
+    <div class="pad-btn" id="fireBtn">●</div>
+    <div class="pad-btn" id="rightBtn">▶</div>
   </div>
 </div>
 
+<footer>保存: localStorage • キーボード: ← → / Space / P</footer>
+
+<!-- Ranking Overlay -->
+<div id="rankingOverlay" class="overlay" style="display:none">
+  <div class="box">
+    <h2>スコアランキング</h2>
+    <table id="rankingTable"><thead><tr><th>順位</th><th>名前</th><th>スコア</th><th>日付</th></tr></thead><tbody></tbody></table>
+    <div style="display:flex;justify-content:space-between;margin-top:12px">
+      <div>
+        <button id="clearRanking" class="ghost">クリア</button>
+      </div>
+      <div>
+        <button id="closeRanking">閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Save Score Overlay (enter name) -->
+<div id="saveOverlay" class="overlay" style="display:none">
+  <div class="box">
+    <h2>スコアを保存</h2>
+    <p>あなたのスコア: <strong id="finalScore">0</strong></p>
+    <div class="row">
+      <label>名前：</label>
+      <input id="playerName" type="text" placeholder="名無し" maxlength="20" />
+      <button id="saveScoreBtn">保存</button>
+    </div>
+    <div style="text-align:right;margin-top:12px"><button id="cancelSave">キャンセル</button></div>
+  </div>
+</div>   
+  <footer>
+       © 2025 STAR CORPORATION - All Rights Reserved.
+   </footer>
+
+
 <script>
-(() => {
+(()=>{
+  // --- existing game code (simplified core) ---
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
-
-  function resize(){
-    const r = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = Math.max(300, rect.width) * r;
-    canvas.height = Math.max(200, rect.height) * r;
-    ctx.setTransform(r,0,0,r,0,0);
-  }
-  window.addEventListener('resize', resize);
-  // ensure canvas has size after layout
-  setTimeout(resize, 50);
+  function fit(){ const r = devicePixelRatio||1; const rect = canvas.getBoundingClientRect(); canvas.width = Math.max(320, rect.width)*r; canvas.height = Math.max(240, rect.height)*r; ctx.setTransform(r,0,0,r,0,0); }
+  window.addEventListener('resize', fit); setTimeout(fit,50);
 
   // state
-  let running = false;
-  let paused = false;
-  let last = performance.now();
-  let score = 0, life = 3;
-  const player = { x: 150, y: 200, w: 36, h: 24, speed: 240, cooldown:0 };
-  const bullets = [];
-  const enemies = [];
+  let running=false, paused=false, last=performance.now();
+  let score=0, life=3, level=1, stage=1, maxStage=3;
+  const bullets=[], enemies=[], enemyBullets=[], lasers=[], particles=[];
+  const player = { x:0,y:0,w:40,h:28,speed:260,cooldown:0,hp:5,maxHp:5 };
+  const keys = {left:false,right:false,fire:false};
+  function placePlayer(){ const r=devicePixelRatio||1; player.x = canvas.width/r/2 - player.w/2; player.y = canvas.height/r - 80; }
+  placePlayer();
 
-  // spawn an enemy periodically
-  let spawnTimer = 0;
+  // simple spawn/loop - kept minimal for clarity
+  function spawnEnemy(){ const r=devicePixelRatio||1; const W=canvas.width/r; const w=28; enemies.push({x:Math.random()*(W-w-20)+10,y:-40,w,w*0.7,speed:80, hp:1,type:'small'}); }
 
-  function reset(){
-    score = 0; life = 3;
-    bullets.length = 0; enemies.length = 0;
-    const r = window.devicePixelRatio || 1;
-    player.x = (canvas.width / r)/2 - player.w/2;
-    player.y = (canvas.height / r) - 80;
-    document.getElementById('score').textContent = score;
-    document.getElementById('life').textContent = life;
-  }
-  reset();
+  // game update/draw (lightweight)
+  let spawnTimer=0;
+  function update(dt){ if(paused) return;
+    // player move
+    if(keys.left) player.x -= player.speed*dt; if(keys.right) player.x += player.speed*dt;
+    const r=devicePixelRatio||1; player.x = Math.max(6, Math.min(canvas.width/r - player.w -6, player.x));
 
-  function spawnEnemy(){
-    const r = window.devicePixelRatio || 1;
-    const W = canvas.width / r;
-    const w = 36;
-    enemies.push({ x: Math.random()*(W - w - 20) + 10, y: -40, w: w, h: 28, speed: 60 + Math.random()*60 });
-  }
+    // firing
+    if(player.cooldown>0) player.cooldown -= dt; if(keys.fire && player.cooldown<=0){ bullets.push({x:player.x+player.w/2-4,y:player.y-12,w:8,h:12,speed:520}); player.cooldown=0.2; }
+    bullets.forEach((b,i)=>{ b.y -= b.speed*dt; if(b.y < -40) bullets.splice(i,1); });
 
-  function update(dt){
-    if(paused) return;
-
-    // move player by keys
-    if(keys.left) player.x -= player.speed * dt;
-    if(keys.right) player.x += player.speed * dt;
-    const r = window.devicePixelRatio || 1;
-    const W = canvas.width / r;
-    player.x = Math.max(6, Math.min(W - player.w - 6, player.x));
-
-    // shooting
-    if(player.cooldown > 0) player.cooldown -= dt;
-    if(keys.fire && player.cooldown <= 0){
-      bullets.push({ x: player.x + player.w/2 - 4, y: player.y - 12, w:8, h:12, speed: 420 });
-      player.cooldown = 0.22;
-    }
-
-    // bullets
-    for(let i = bullets.length-1; i>=0; i--){
-      bullets[i].y -= bullets[i].speed * dt;
-      if(bullets[i].y < -40) bullets.splice(i,1);
-    }
-
-    // spawn
-    spawnTimer -= dt;
-    if(spawnTimer <= 0){
-      spawnTimer = 0.9;
-      spawnEnemy();
-    }
-
-    // enemies movement & simple collision with bullets
-    for(let i = enemies.length-1; i>=0; i--){
-      const e = enemies[i];
-      e.y += e.speed * dt;
-      // if enemy off bottom, remove
-      if(e.y > canvas.height + 40) { enemies.splice(i,1); continue; }
-
-      // collision with bullets
-      for(let j = bullets.length-1; j>=0; j--){
-        const b = bullets[j];
-        if(!(b.x+b.w < e.x || b.x > e.x+e.w || b.y+b.h < e.y || b.y > e.y+e.h)){
-          bullets.splice(j,1);
-          enemies.splice(i,1);
-          score += 10;
-          document.getElementById('score').textContent = score;
-          break;
-        }
-      }
-    }
-  }
-
-  function draw(){
-    const r = window.devicePixelRatio || 1;
-    const W = canvas.width / r, H = canvas.height / r;
-    ctx.clearRect(0,0,W,H);
-
-    // background (simple)
-    ctx.fillStyle = '#00131a';
-    ctx.fillRect(0,0,W,H);
-
-    // player (blue rectangle)
-    ctx.fillStyle = '#39f';
-    ctx.fillRect(player.x, player.y, player.w, player.h);
-    // player gun tip for visibility
-    ctx.fillStyle = '#aef';
-    ctx.fillRect(player.x + player.w/2 -2, player.y - 6, 4, 6);
-
-    // bullets
-    ctx.fillStyle = '#fff';
-    bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+    spawnTimer -= dt; if(spawnTimer<=0){ spawnTimer = 0.9; spawnEnemy(); }
 
     // enemies
-    ctx.fillStyle = '#f55';
-    enemies.forEach(e => ctx.fillRect(e.x, e.y, e.w, e.h));
+    for(let i=enemies.length-1;i>=0;i--){ const e=enemies[i]; e.y += e.speed*dt; if(e.y > canvas.height) enemies.splice(i,1); else {
+        // collision bullets
+        for(let j=bullets.length-1;j>=0;j--){ const b=bullets[j]; if(!(b.x+b.w<e.x || b.x>e.x+e.w || b.y+b.h<e.y || b.y>e.y+e.h)){ bullets.splice(j,1); enemies.splice(i,1); score+=10; document.getElementById('score').textContent=score; break; } }
+      }}
 
-    // paused overlay
-    if(paused){
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(0,0,W,H);
-      ctx.fillStyle = '#fff';
-      ctx.font = '24px sans-serif';
-      ctx.fillText('PAUSED', W/2 - 36, H/2);
-    }
+    // simplistic game over condition
+    if(score>9999){ running=false; onGameEnd(); }
   }
 
-  function loop(ts){
-    const dt = Math.min(0.05, (ts - last) / 1000);
-    last = ts;
-    if(running) update(dt);
-    draw();
-    requestAnimationFrame(loop);
+  function draw(){ const r=devicePixelRatio||1; const W=canvas.width/r, H=canvas.height/r; ctx.clearRect(0,0,W,H); ctx.fillStyle='#00131a'; ctx.fillRect(0,0,W,H);
+    // player
+    ctx.fillStyle='#9ef'; ctx.fillRect(player.x,player.y,player.w,player.h);
+    // bullets
+    ctx.fillStyle='#fff'; bullets.forEach(b=>ctx.fillRect(b.x,b.y,b.w,b.h));
+    // enemies
+    ctx.fillStyle='#f55'; enemies.forEach(e=>ctx.fillRect(e.x,e.y,e.w,e.h));
   }
+
+  function loop(ts){ const dt = Math.min(0.05,(ts-last)/1000); last=ts; if(running) update(dt); draw(); requestAnimationFrame(loop); }
   requestAnimationFrame(loop);
 
   // input
-  const keys = { left:false, right:false, fire:false };
-  window.addEventListener('keydown', e=>{
-    if(e.key === 'ArrowLeft') keys.left = true;
-    if(e.key === 'ArrowRight') keys.right = true;
-    if(e.code === 'Space') { keys.fire = true; e.preventDefault(); }
-    if(e.key.toLowerCase() === 'p') paused = !paused;
-  });
-  window.addEventListener('keyup', e=>{
-    if(e.key === 'ArrowLeft') keys.left = false;
-    if(e.key === 'ArrowRight') keys.right = false;
-    if(e.code === 'Space') keys.fire = false;
+  window.addEventListener('keydown',e=>{ if(e.key==='ArrowLeft') keys.left=true; if(e.key==='ArrowRight') keys.right=true; if(e.code==='Space'){ keys.fire=true; e.preventDefault(); } if(e.key.toLowerCase()==='p') paused=!paused; });
+  window.addEventListener('keyup',e=>{ if(e.key==='ArrowLeft') keys.left=false; if(e.key==='ArrowRight') keys.right=false; if(e.code==='Space') keys.fire=false; });
+
+  document.getElementById('startBtn').addEventListener('click', ()=>{ start(); });
+  document.getElementById('pauseBtn').addEventListener('click', ()=>{ paused=!paused; });
+  document.getElementById('restartBtn').addEventListener('click', ()=>{ resetGame(); start(); });
+
+  // --- Ranking system (localStorage) ---
+  const RANK_KEY = 'shoot_ranking_v1';
+  function loadRanking(){ try{ const s = localStorage.getItem(RANK_KEY); if(!s) return []; return JSON.parse(s); }catch(e){ return []; } }
+  function saveRanking(list){ localStorage.setItem(RANK_KEY, JSON.stringify(list)); }
+
+  function addScoreToRanking(name, value){ const list = loadRanking(); const entry = { name: name || '名無し', score: value, date: (new Date()).toLocaleString() }; list.push(entry); list.sort((a,b)=>b.score - a.score); if(list.length>50) list.length = 50; saveRanking(list); }
+
+  function showRanking(){ const list = loadRanking(); const tbody = document.querySelector('#rankingTable tbody'); tbody.innerHTML=''; list.slice(0,20).forEach((e,i)=>{ const tr = document.createElement('tr'); tr.innerHTML = `<td>${i+1}</td><td>${escapeHtml(e.name)}</td><td>${e.score}</td><td>${e.date}</td>`; tbody.appendChild(tr); }); document.getElementById('rankingOverlay').style.display='flex'; }
+  function clearRanking(){ if(confirm('ランキングを本当に消しますか？')){ saveRanking([]); showRanking(); } }
+
+  function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  document.getElementById('viewRankingBtn').addEventListener('click', showRanking);
+  document.getElementById('closeRanking').addEventListener('click', ()=>{ document.getElementById('rankingOverlay').style.display='none'; });
+  document.getElementById('clearRanking').addEventListener('click', clearRanking);
+
+  // On game end: show save overlay
+  function onGameEnd(){ // show save dialog
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('saveOverlay').style.display = 'flex';
+  }
+  document.getElementById('cancelSave').addEventListener('click', ()=>{ document.getElementById('saveOverlay').style.display='none'; });
+  document.getElementById('saveScoreBtn').addEventListener('click', ()=>{
+    const name = document.getElementById('playerName').value.trim() || '名無し'; addScoreToRanking(name, score); document.getElementById('saveOverlay').style.display='none'; showRanking();
   });
 
-  // UI buttons
-  document.getElementById('startBtn').addEventListener('click', ()=>{ running = true; paused = false; last = performance.now(); });
-  document.getElementById('pauseBtn').addEventListener('click', ()=>{ paused = !paused; });
-  document.getElementById('restartBtn').addEventListener('click', ()=>{ reset(); });
+  // helper to trigger game end manually for demo: press R when running
+  window.addEventListener('keydown', e=>{ if(e.key.toLowerCase()==='r' && running){ running=false; onGameEnd(); } });
 
-  // initial small move to ensure visible
-  player.x = 120;
-  player.y = 220;
+  // start/reset
+  function start(){ running=true; paused=false; last = performance.now(); }
+  function resetGame(){ score = 0; life = 3; level = 1; stage = 1; bullets.length=0; enemies.length=0; enemyBullets.length=0; lasers.length=0; particles.length=0; placePlayer(); document.getElementById('score').textContent = score; document.getElementById('life').textContent = life; }
+
+  // initial
+  resetGame();
+
 })();
 </script>
 </body>
