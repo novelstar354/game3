@@ -3,18 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
- <link rel="icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQoZ5nF2nh3MGMh1FdK-P-WiE6f-TJUeZJDI1QVThw-Ew&s=10" sizes="16×16" type="image/png" />  
+<link rel="icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQoZ5nF2nh3MGMh1FdK-P-WiE6f-TJUeZJDI1QVThw-Ew&s=10" sizes="16×16" type="image/png">
 <title>ブロックシューティング</title>
 <style>
-footer {
-           padding: 30px;
-           text-align: center;
-           font-size: 0.85rem;
-           color: rgba(255,255,255,0.5);
-           border-top: 1px solid rgba(255,255,255,0.1);
-           margin-top: 60px;
-       }
-
 :root{
   --bg1:#061426; --panel:#0b2233; --accent:#39f; --muted:#bcd;
 }
@@ -40,7 +31,7 @@ canvas{width:100%;height:68vh;border-radius:12px;display:block;background:#00131
 .footer{font-size:12px;color:#8fa; text-align:center;margin-top:8px}
 
 /* Ensure overlay text white */
-#pauseOverlay .panel, #shopOverlay .panel, #skillOverlay .panel, #titleOverlay .panel, #saveOverlay .panel { color: #fff; }
+#pauseOverlay .panel, #shopOverlay .panel, #skillOverlay .panel, #titleOverlay .panel, #saveOverlay .panel { color: #ffffff; }
 
 /* Simple HP bars */
 .hudbar{width:160px;height:12px;border-radius:6px;background:rgba(255,255,255,0.06);overflow:hidden}
@@ -52,6 +43,14 @@ canvas{width:100%;height:68vh;border-radius:12px;display:block;background:#00131
 @media(max-width:640px){
   button{padding:8px 10px;font-size:14px}
   .panel{min-width:260px}
+footer {
+           padding: 30px;
+           text-align: center;
+           font-size: 0.85rem;
+           color: rgba(255,255,255,0.5);
+           border-top: 1px solid rgba(255,255,255,0.1);
+           margin-top: 60px;
+       }
 }
 </style>
 </head>
@@ -170,6 +169,10 @@ canvas{width:100%;height:68vh;border-radius:12px;display:block;background:#00131
 
 <div class="footer">Saved locally (localStorage). Report console errors if any.</div>
 
+<footer>
+       © 2025 STAR CORPORATION - All Rights Reserved.
+   </footer>
+    
 <script>
 /* ---------- Setup ---------- */
 const canvas = document.getElementById('game');
@@ -243,8 +246,8 @@ let openedFromPause = false;
 
 /* constants you set */
 const BULLET_DAMAGE = 15; // as requested
-const ENEMY_SMALL_HP = 20;
-const BOSS_HP = 800;
+const ENEMY_SMALL_HP = 45;
+const BOSS_HP = 2400;
 
 /* helpers */
 function rand(a,b){ return Math.random()*(b-a)+a; }
